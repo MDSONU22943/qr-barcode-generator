@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>End-to-End QR & Barcode Generator</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f4f7fb; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { background: #fff; padding: 28px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); width: 100%; max-width: 460px; }
+        h2 { margin-top: 0; color: #1e293b; font-size: 22px; }
+        label { display: block; margin-top: 15px; font-weight: 600; color: #334155; font-size: 14px; }
+        select, input { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
+        .hint { font-size: 12px; color: #64748b; margin-top: 5px; }
+        button { width: 100%; margin-top: 20px; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #1d4ed8; }
+        .error { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; margin-top: 15px; font-size: 14px; display: none; }
+        .result-box { margin-top: 24px; text-align: center; padding: 20px; border: 1px dashed #cbd5e1; border-radius: 8px; display: none; }
+        .result-box img { max-width: 100%; height: auto; margin-bottom: 15px; }
+        .download-btn { display: inline-block; padding: 8px 16px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>QR & Barcode Generator</h2>
+
+    <label for="type">Select Code Type</label>
+    <select id="type" onchange="updateHint()">
+        <option value="qrcode">QR Code (Links, UPI, Text)</option>
+        <option value="code128">Code 128 (Inventory, Shipping - Alphanumeric)</option>
+        <option value="ean13">EAN-13 (Retail Global - 12/13 Digits)</option>
+        <option value="ean8">EAN-8 (Small Retail - 7/8 Digits)</option>
+        <option value="upca">UPC-A (US/Canada Retail - 11/12 Digits)</option>
+    </select>
+
+    <label for="text">Enter Data / Value</label>
+    <input type="text" id="text" placeholder="https://example.com" value="https://example.com" />
+    <div id="hint" class="hint">Max 2953 characters (URLs, text, numbers, symbols allowed).</div>
+
+    <button onclick="generateCode()">Generate Code</button>
+
+    <div id="error" class="error"></div>
+
+    <div id="resultBox" class="result-box">
+        <img id="codeImage" src="" alt="Generated Code" />
+        <br />
+        <a id="downloadLink" class="download-btn" download="code.png">Download PNG</a>
+    </div>
+</div>
+
+<script>
+    const hints = {
+        qrcode: { text: "Max 2953 characters (URLs, text, symbols allowed).", sample: "https://zoho.com" },
+        code128: { text: "Max 48 ASCII characters (Letters + Numbers allowed).", sample: "INV-2026-001" },
+        ean13: { text: "Sirf 12 digits dalein (13th check-digit auto calculate hoga).", sample: "590123412345" },
+        ean8: { text: "Sirf 7 digits dalein (8th check-digit auto calculate hoga).", sample: "9638507" },
+        upca: { text: "Sirf 11 digits dalein (12th check-digit auto calculate hoga).", sample: "01234567890" }
+    };
+
+    function updateHint() {
+        const type = document.getElementById('type').value;
+        document.getElementById('hint').innerText = hints[type].text;
+        document.getElementById('text').value = hints[type].sample;
+        document.getElementById('error').style.display = 'none';
+    }
+
+    async function generateCode() {
+        const type = document.getElementById('type').value;
+        const text = document.getElementById('text').value;
+        const errorDiv = document.getElementById('error');
+        const resultBox = document.getElementById('resultBox');
+
+        errorDiv.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, text })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                errorDiv.innerText = data.message;
+                errorDiv.style.display = 'block';
+                resultBox.style.display = 'none';
+                return;
+            }
+
+            document.getElementById('codeImage').src = data.image;
+            document.getElementById('downloadLink').href = data.image;
+            document.getElementById('downloadLink').download = `${type}-${Date.now()}.png`;
+            resultBox.style.display = 'block';
+
+        } catch (err) {
+            errorDiv.innerText = "Server se connect nahi ho paya.";
+            errorDiv.style.display = 'block';
+        }
+    }
+</script>
+
+</body>
+</html>
