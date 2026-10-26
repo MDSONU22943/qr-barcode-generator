@@ -3,100 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>End-to-End QR & Barcode Generator</title>
+    <title>End-to-End Barcode POS & Scanner</title>
+    <!-- html5-qrcode library for Webcam Barcode & QR Scanning -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: #f4f7fb; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .card { background: #fff; padding: 28px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); width: 100%; max-width: 460px; }
-        h2 { margin-top: 0; color: #1e293b; font-size: 22px; }
-        label { display: block; margin-top: 15px; font-weight: 600; color: #334155; font-size: 14px; }
-        select, input { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
-        .hint { font-size: 12px; color: #64748b; margin-top: 5px; }
-        button { width: 100%; margin-top: 20px; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
+        .container { max-width: 960px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+        .card { background: #fff; padding: 22px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); }
+        h2 { margin-top: 0; font-size: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        label { display: block; margin-top: 12px; font-weight: 600; font-size: 13px; color: #475569; }
+        input, select { width: 100%; padding: 9px 12px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+        .row { display: flex; gap: 10px; }
+        button { width: 100%; margin-top: 16px; padding: 11px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
         button:hover { background: #1d4ed8; }
-        .error { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; margin-top: 15px; font-size: 14px; display: none; }
-        .result-box { margin-top: 24px; text-align: center; padding: 20px; border: 1px dashed #cbd5e1; border-radius: 8px; display: none; }
-        .result-box img { max-width: 100%; height: auto; margin-bottom: 15px; }
-        .download-btn { display: inline-block; padding: 8px 16px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; }
+        .btn-secondary { background: #475569; }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; }
+        .product-card { margin-top: 18px; padding: 16px; border-radius: 8px; background: #ecfdf5; border: 1px solid #10b981; display: none; }
+        .product-card h3 { margin: 0 0 8px 0; color: #065f46; }
+        .badge { display: inline-block; padding: 4px 8px; background: #059669; color: #fff; border-radius: 4px; font-size: 12px; }
+        .error-box { margin-top: 18px; padding: 12px; border-radius: 8px; background: #fef2f2; border: 1px solid #ef4444; color: #b91c1c; display: none; }
+        .barcode-preview { text-align: center; margin-top: 16px; padding: 12px; border: 1px dashed #94a3b8; border-radius: 8px; display: none; }
+        .barcode-preview img { max-width: 100%; height: auto; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>QR & Barcode Generator</h2>
+<div class="container">
+    <!-- LEFT COLUMN: SCANNER & PRODUCT LOOKUP -->
+    <div class="card">
+        <h2>1. Scan Barcode / QR Code</h2>
+        
+        <!-- Webcam Scanner Box -->
+        <div id="reader"></div>
+        <button id="toggleCamBtn" onclick="toggleCamera()">Start Webcam Scanner</button>
 
-    <label for="type">Select Code Type</label>
-    <select id="type" onchange="updateHint()">
-        <option value="qrcode">QR Code (Links, UPI, Text)</option>
-        <option value="code128">Code 128 (Inventory, Shipping - Alphanumeric)</option>
-        <option value="ean13">EAN-13 (Retail Global - 12/13 Digits)</option>
-        <option value="ean8">EAN-8 (Small Retail - 7/8 Digits)</option>
-        <option value="upca">UPC-A (US/Canada Retail - 11/12 Digits)</option>
-    </select>
+        <!-- Manual / USB Laser Scanner Input -->
+        <label for="manualCode">Ya USB Scanner / Manual Code Enter Karein:</label>
+        <div class="row">
+            <input type="text" id="manualCode" placeholder="e.g. INV-2026-001" onkeypress="handleEnter(event)" />
+            <button style="margin-top: 5px; width: 120px;" onclick="fetchProduct(document.getElementById('manualCode').value)">Search</button>
+        </div>
 
-    <label for="text">Enter Data / Value</label>
-    <input type="text" id="text" placeholder="https://example.com" value="https://example.com" />
-    <div id="hint" class="hint">Max 2953 characters (URLs, text, numbers, symbols allowed).</div>
+        <!-- Scanned Product Result -->
+        <div id="productResult" class="product-card">
+            <span id="prodCategory" class="badge">Category</span>
+            <h3 id="prodName" style="margin-top:8px;">Product Name</h3>
+            <p style="margin: 5px 0;"><strong>Code:</strong> <span id="prodCode"></span></p>
+            <p style="margin: 5px 0; font-size: 18px; color: #047857;"><strong>Price: ₹<span id="prodPrice"></span></strong></p>
+            <p style="margin: 5px 0;"><strong>Available Stock:</strong> <span id="prodStock"></span> units</p>
+        </div>
 
-    <button onclick="generateCode()">Generate Code</button>
+        <div id="scanError" class="error-box"></div>
+    </div>
 
-    <div id="error" class="error"></div>
+    <!-- RIGHT COLUMN: ADD PRODUCT & GENERATE BARCODE -->
+    <div class="card">
+        <h2>2. Add Product & Generate Code</h2>
 
-    <div id="resultBox" class="result-box">
-        <img id="codeImage" src="" alt="Generated Code" />
-        <br />
-        <a id="downloadLink" class="download-btn" download="code.png">Download PNG</a>
+        <label>Barcode Type</label>
+        <select id="type">
+            <option value="code128">Code 128 (Alphanumeric - e.g. INV-2026-001)</option>
+            <option value="qrcode">QR Code (Any Text / ID)</option>
+            <option value="ean13">EAN-13 (13 Digits - e.g. 5901234123457)</option>
+        </select>
+
+        <label>Unique Barcode / Product ID</label>
+        <input type="text" id="code" value="INV-2026-001" />
+
+        <label>Product Name</label>
+        <input type="text" id="name" value="Logitech Wireless Mouse M185" />
+
+        <div class="row">
+            <div style="flex:1">
+                <label>Price (₹)</label>
+                <input type="number" id="price" value="699" />
+            </div>
+            <div style="flex:1">
+                <label>Stock Quantity</label>
+                <input type="number" id="stock" value="42" />
+            </div>
+        </div>
+
+        <button onclick="saveAndGenerate()">Save Product & Generate Barcode</button>
+
+        <div id="barcodePreview" class="barcode-preview">
+            <img id="barcodeImg" src="" alt="Barcode" />
+            <p style="font-size: 12px; color: #64748b; margin: 8px 0 0 0;">
+                Is barcode ki apne phone mein photo khichein aur Webcam ke samne layein!
+            </p>
+        </div>
     </div>
 </div>
 
 <script>
-    const hints = {
-        qrcode: { text: "Max 2953 characters (URLs, text, symbols allowed).", sample: "https://zoho.com" },
-        code128: { text: "Max 48 ASCII characters (Letters + Numbers allowed).", sample: "INV-2026-001" },
-        ean13: { text: "Sirf 12 digits dalein (13th check-digit auto calculate hoga).", sample: "590123412345" },
-        ean8: { text: "Sirf 7 digits dalein (8th check-digit auto calculate hoga).", sample: "9638507" },
-        upca: { text: "Sirf 11 digits dalein (12th check-digit auto calculate hoga).", sample: "01234567890" }
-    };
+    let html5QrCode = null;
+    let isScanning = false;
 
-    function updateHint() {
-        const type = document.getElementById('type').value;
-        document.getElementById('hint').innerText = hints[type].text;
-        document.getElementById('text').value = hints[type].sample;
-        document.getElementById('error').style.display = 'none';
+    // 1. Webcam Start / Stop Logic
+    async function toggleCamera() {
+        const btn = document.getElementById('toggleCamBtn');
+
+        if (isScanning) {
+            await html5QrCode.stop();
+            isScanning = false;
+            btn.innerText = "Start Webcam Scanner";
+            btn.classList.remove('btn-secondary');
+            return;
+        }
+
+        html5QrCode = new Html5Qrcode("reader");
+        btn.innerText = "Stop Webcam Scanner";
+        btn.classList.add('btn-secondary');
+        isScanning = true;
+
+        html5QrCode.start(
+            { facingMode: "environment" }, // Mobile par back camera aur laptop par webcam use karega
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            (decodedText) => {
+                // Jaise hi barcode scan hoga, yeh function chalega
+                document.getElementById('manualCode').value = decodedText;
+                fetchProduct(decodedText);
+            },
+            (errorMessage) => {
+                // Scanning चल रही है (ignore frame errors)
+            }
+        ).catch(err => {
+            alert("Camera start nahi ho paya. Permission check karein: " + err);
+            isScanning = false;
+            btn.innerText = "Start Webcam Scanner";
+        });
     }
 
-    async function generateCode() {
-        const type = document.getElementById('type').value;
-        const text = document.getElementById('text').value;
-        const errorDiv = document.getElementById('error');
-        const resultBox = document.getElementById('resultBox');
-
-        errorDiv.style.display = 'none';
+    // 2. Backend se Product Details Fetch Karna
+    async function fetchProduct(code) {
+        if (!code) return;
+        const resultCard = document.getElementById('productResult');
+        const errorBox = document.getElementById('scanError');
 
         try {
-            const response = await fetch('/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, text })
-            });
-
-            const data = await response.json();
+            const res = await fetch(`/api/product/${encodeURIComponent(code)}`);
+            const data = await res.json();
 
             if (!data.success) {
-                errorDiv.innerText = data.message;
-                errorDiv.style.display = 'block';
-                resultBox.style.display = 'none';
+                resultCard.style.display = 'none';
+                errorBox.innerText = data.message;
+                errorBox.style.display = 'block';
                 return;
             }
 
-            document.getElementById('codeImage').src = data.image;
-            document.getElementById('downloadLink').href = data.image;
-            document.getElementById('downloadLink').download = `${type}-${Date.now()}.png`;
-            resultBox.style.display = 'block';
+            // Product mil gaya -> Screen par dikhayein
+            errorBox.style.display = 'none';
+            document.getElementById('prodCategory').innerText = data.product.category;
+            document.getElementById('prodName').innerText = data.product.name;
+            document.getElementById('prodCode').innerText = data.product.code;
+            document.getElementById('prodPrice').innerText = data.product.price;
+            document.getElementById('prodStock').innerText = data.product.stock;
+            resultCard.style.display = 'block';
 
         } catch (err) {
-            errorDiv.innerText = "Server se connect nahi ho paya.";
-            errorDiv.style.display = 'block';
+            errorBox.innerText = "Server error occurred.";
+            errorBox.style.display = 'block';
+        }
+    }
+
+    // 3. Product Save aur Barcode Generate Karna
+    async function saveAndGenerate() {
+        const payload = {
+            type: document.getElementById('type').value,
+            text: document.getElementById('code').value,
+            name: document.getElementById('name').value,
+            price: document.getElementById('price').value,
+            stock: document.getElementById('stock').value,
+            category: "Inventory"
+        };
+
+        const res = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('barcodeImg').src = data.image;
+            document.getElementById('barcodePreview').style.display = 'block';
+        } else {
+            alert(data.message);
+        }
+    }
+
+    // USB Barcode Scanner (jo Enter press karta hai) ke liye support
+    function handleEnter(e) {
+        if (e.key === 'Enter') {
+            fetchProduct(e.target.value);
         }
     }
 </script>
